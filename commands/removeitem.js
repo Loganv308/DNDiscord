@@ -1,0 +1,52 @@
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { findItem, removeItemFromInventory } = require('../db/database');
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('removeitem')
+    .setDescription('Remove an item from a player\'s inventory (admin only)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .addUserOption(opt =>
+      opt.setName('user').setDescription('Target player').setRequired(true)
+    )
+    .addStringOption(opt =>
+      opt.setName('item').setDescription('Item name to remove').setRequired(true)
+    )
+    .addIntegerOption(opt =>
+      opt.setName('amount').setDescription('Quantity to remove (default: 1)').setRequired(false).setMinValue(1)
+    ),
+
+  async execute(interaction) {
+    const target = interaction.options.getUser('user');
+    const name   = interaction.options.getString('item');
+    const amount = interaction.options.getInteger('amount') ?? 1;
+
+    const item = findItem(interaction.guildId, name);
+    if (!item) {
+      return interaction.reply({
+        content: `❌ No item named **${name}** exists in this server.`,
+        ephemeral: true,
+      });
+    }
+
+    const removed = removeItemFromInventory(target.id, interaction.guildId, item.item_id, amount);
+    if (!removed) {
+      return interaction.reply({
+        content: `❌ <@${target.id}> doesn't have **${item.name}** in their inventory.`,
+        ephemeral: true,
+      });
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0xED4245)
+      .setTitle('Item removed')
+      .addFields(
+        { name: 'Player',   value: `<@${target.id}>`, inline: true },
+        { name: 'Item',     value: item.name,          inline: true },
+        { name: 'Quantity', value: amount.toString(),  inline: true },
+      )
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+  },
+};
