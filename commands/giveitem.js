@@ -1,5 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { findItem, transferItem, RARITY_COLORS } = require('../db/database');
+const { findItem, getInventory, transferItem, RARITY_COLORS } = require('../db/database');
+
+const RARITY_BADGE = { common: '⬜', uncommon: '🟩', rare: '🟦', epic: '🟪', legendary: '🟨' };
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -9,11 +11,26 @@ module.exports = {
       opt.setName('user').setDescription('Player to give the item to').setRequired(true)
     )
     .addStringOption(opt =>
-      opt.setName('item').setDescription('Name of the item to give').setRequired(true)
+      opt.setName('item').setDescription('Item to give').setRequired(true).setAutocomplete(true)
     )
     .addIntegerOption(opt =>
       opt.setName('amount').setDescription('Quantity to give (default: 1)').setRequired(false).setMinValue(1)
     ),
+
+  async autocomplete(interaction) {
+    const focused = interaction.options.getFocused().toLowerCase();
+    // Only show items the calling user actually has
+    const inventory = getInventory(interaction.user.id, interaction.guildId);
+    const filtered = inventory
+      .filter(i => i.name.toLowerCase().includes(focused))
+      .slice(0, 25);
+    await interaction.respond(
+      filtered.map(i => ({
+        name: `${RARITY_BADGE[i.rarity] ?? '⬜'} ${i.name}${i.amount > 1 ? ` ×${i.amount}` : ''} — ${i.rarity}`,
+        value: i.name,
+      }))
+    );
+  },
 
   async execute(interaction) {
     const target = interaction.options.getUser('user');
@@ -27,10 +44,7 @@ module.exports = {
 
     const item = findItem(interaction.guildId, name);
     if (!item) {
-      return interaction.reply({
-        content: `❌ No item named **${name}** exists.`,
-        ephemeral: true,
-      });
+      return interaction.reply({ content: `❌ No item named **${name}** exists.`, ephemeral: true });
     }
 
     const result = transferItem(interaction.user.id, target.id, interaction.guildId, item.item_id, amount);
@@ -51,6 +65,8 @@ module.exports = {
       .setDescription(`<@${interaction.user.id}> gave **${amount}x ${item.name}** to <@${target.id}>`)
       .setFooter({ text: 'Transferred items are visible to their new owner.' })
       .setTimestamp();
+
+    if (item.image_url) embed.setThumbnail(item.image_url);
 
     await interaction.reply({ embeds: [embed] });
   },

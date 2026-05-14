@@ -1,5 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const { findItem, removeItemFromInventory } = require('../db/database');
+const { findItem, listItems, removeItemFromInventory } = require('../db/database');
+
+const RARITY_BADGE = { common: '⬜', uncommon: '🟩', rare: '🟦', epic: '🟪', legendary: '🟨' };
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -10,11 +12,25 @@ module.exports = {
       opt.setName('user').setDescription('Target player').setRequired(true)
     )
     .addStringOption(opt =>
-      opt.setName('item').setDescription('Item name to remove').setRequired(true)
+      opt.setName('item').setDescription('Item to remove').setRequired(true).setAutocomplete(true)
     )
     .addIntegerOption(opt =>
       opt.setName('amount').setDescription('Quantity to remove (default: 1)').setRequired(false).setMinValue(1)
     ),
+
+  async autocomplete(interaction) {
+    const focused = interaction.options.getFocused().toLowerCase();
+    const items = listItems(interaction.guildId);
+    const filtered = items
+      .filter(i => i.name.toLowerCase().includes(focused))
+      .slice(0, 25);
+    await interaction.respond(
+      filtered.map(i => ({
+        name: `${RARITY_BADGE[i.rarity] ?? '⬜'} ${i.name} — ${i.rarity}`,
+        value: i.name,
+      }))
+    );
+  },
 
   async execute(interaction) {
     const target = interaction.options.getUser('user');
