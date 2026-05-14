@@ -21,19 +21,38 @@ client.once(Events.ClientReady, () => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-
-  const command = client.commands.get(interaction.commandName);
-  if (!command) return;
-
   try {
-    await command.execute(interaction);
+    // ── Autocomplete ────────────────────────────────────────────────────
+    if (interaction.isAutocomplete()) {
+      const command = client.commands.get(interaction.commandName);
+      if (command?.autocomplete) await command.autocomplete(interaction);
+      return;
+    }
+
+    // ── Slash commands ──────────────────────────────────────────────────
+    if (interaction.isChatInputCommand()) {
+      const command = client.commands.get(interaction.commandName);
+      if (!command) return;
+      await command.execute(interaction);
+      return;
+    }
+
+    // ── Select menus ────────────────────────────────────────────────────
+    if (interaction.isStringSelectMenu()) {
+      if (interaction.customId === 'help_menu') {
+        const help = client.commands.get('help');
+        if (help?.handleSelect) await help.handleSelect(interaction);
+      }
+      return;
+    }
   } catch (err) {
-    console.error(`Error in /${interaction.commandName}:`, err);
-    const msg = { content: '❌ Something went wrong running that command.', ephemeral: true };
-    interaction.replied || interaction.deferred
-      ? await interaction.followUp(msg)
-      : await interaction.reply(msg);
+    console.error('Interaction error:', err);
+    const msg = { content: '❌ Something went wrong.', ephemeral: true };
+    try {
+      interaction.replied || interaction.deferred
+        ? await interaction.followUp(msg)
+        : await interaction.reply(msg);
+    } catch { /* interaction may have already expired */ }
   }
 });
 
