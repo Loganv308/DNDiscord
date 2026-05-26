@@ -24,10 +24,8 @@ module.exports = {
           { name: '🟨 Legendary', value: 'legendary' },
         )
     )
-    .addStringOption(opt =>
-      opt.setName('image_url')
-        .setDescription('Image URL for this item (paste a Discord attachment URL or direct image link)')
-        .setRequired(false)
+    .addAttachmentOption(opt =>
+      opt.setName('image').setDescription('Upload an image').setRequired(false)
     )
     .addBooleanOption(opt =>
       opt.setName('hidden')
@@ -35,19 +33,13 @@ module.exports = {
         .setRequired(false)
     ),
 
-  async execute(interaction) {
+    async execute(interaction) {
     const name        = interaction.options.getString('name');
     const description = interaction.options.getString('description') ?? null;
     const rarity      = interaction.options.getString('rarity') ?? 'common';
-    const imageUrl    = interaction.options.getString('image_url') ?? null;
+    const attachment  = interaction.options.getAttachment('image') ?? null;
+    const imageUrl    = attachment?.url ?? null;
     const hidden      = interaction.options.getBoolean('hidden') ?? false;
-
-    // Basic URL validation if provided
-    if (imageUrl) {
-      try { new URL(imageUrl); } catch {
-        return interaction.reply({ content: '❌ `image_url` doesn\'t look like a valid URL.', ephemeral: true });
-      }
-    }
 
     const itemId = createItem(interaction.guildId, name, description, rarity, imageUrl, hidden);
 
@@ -55,11 +47,11 @@ module.exports = {
       .setColor(RARITY_COLORS[rarity])
       .setTitle('Item created')
       .addFields(
-        { name: 'Name',       value: name,                              inline: true },
-        { name: 'Rarity',     value: rarity,                            inline: true },
-        { name: 'Item ID',    value: `#${itemId}`,                      inline: true },
-        { name: 'Hidden',     value: hidden ? '🔒 Yes' : '👁️ No',        inline: true },
-        { name: 'Image',      value: imageUrl ? '✅ Set' : '*None*',     inline: true },
+        { name: 'Name',        value: name,                           inline: true },
+        { name: 'Rarity',      value: rarity,                         inline: true },
+        { name: 'Item ID',     value: `#${itemId}`,                   inline: true },
+        { name: 'Hidden',      value: hidden ? '🔒 Yes' : '👁️ No',    inline: true },
+        { name: 'Image',       value: imageUrl ? '✅ Set' : '*None*',  inline: true },
         { name: 'Description', value: description ?? '*None*' },
       )
       .setFooter({ text: 'Use /additem to give this item to a player.' })

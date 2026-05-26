@@ -25,7 +25,8 @@ client.on(Events.InteractionCreate, async interaction => {
     // ── Autocomplete ────────────────────────────────────────────────────
     if (interaction.isAutocomplete()) {
       const command = client.commands.get(interaction.commandName);
-      if (command?.autocomplete) await command.autocomplete(interaction);
+      if (!command?.autocomplete) return;
+      await command.autocomplete(interaction);
       return;
     }
 

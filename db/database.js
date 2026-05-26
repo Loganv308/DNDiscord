@@ -4,10 +4,6 @@ const fs = require('fs');
 
 const DB_PATH = path.join(__dirname, '../data.db');
 
-// ─── Bootstrap ─────────────────────────────────────────────────────────────
-// sql.js is async to initialise (loads a WASM binary), so we expose a
-// promise that index.js awaits before logging the bot in.
-
 let db;
 
 const ready = initSqlJs().then(SQL => {
@@ -18,12 +14,11 @@ const ready = initSqlJs().then(SQL => {
   return db;
 });
 
-// Persist the in-memory database to disk after every write
 function save() {
   fs.writeFileSync(DB_PATH, Buffer.from(db.export()));
 }
 
-// ─── Tiny query helpers (mirror better-sqlite3's API) ─────────────────────
+// ─── Query helpers ─────────────────────────────────────────────────────────
 
 function run(sql, params = []) {
   db.run(sql, params);
@@ -67,9 +62,6 @@ function createSchema() {
       user_id       TEXT NOT NULL,
       guild_id      TEXT NOT NULL,
       name          TEXT,
-      class         TEXT,
-      level         INTEGER NOT NULL DEFAULT 1,
-      hitpoints     INTEGER NOT NULL DEFAULT 100,
       administrator INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (user_id, guild_id)
     );
@@ -121,16 +113,12 @@ function hasPlayer(userId, guildId) {
   return !!(row && row.name);
 }
 
-function createPlayer(userId, guildId, name, playerClass, level = 1, hitpoints = 100) {
+function createPlayer(userId, guildId, name) {
   run(`
-    INSERT INTO user (user_id, guild_id, name, class, level, hitpoints)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(user_id, guild_id) DO UPDATE SET
-      name      = excluded.name,
-      class     = excluded.class,
-      level     = excluded.level,
-      hitpoints = excluded.hitpoints
-  `, [userId, guildId, name, playerClass, level, hitpoints]);
+    INSERT INTO user (user_id, guild_id, name)
+    VALUES (?, ?, ?)
+    ON CONFLICT(user_id, guild_id) DO UPDATE SET name = excluded.name
+  `, [userId, guildId, name]);
   run(`INSERT OR IGNORE INTO balance (user_id, guild_id) VALUES (?, ?)`, [userId, guildId]);
 }
 
@@ -139,13 +127,14 @@ function getUser(userId, guildId) {
 }
 
 function updateUser(userId, guildId, fields) {
-  const allowed = ['name', 'class', 'level', 'hitpoints', 'administrator'];
+  const allowed = ['name', 'administrator'];
   const keys = Object.keys(fields).filter(k => allowed.includes(k));
   if (!keys.length) return;
   const set = keys.map(k => `${k} = ?`).join(', ');
   run(`UPDATE user SET ${set} WHERE user_id = ? AND guild_id = ?`,
     [...keys.map(k => fields[k]), userId, guildId]);
 }
+
 
 // ─── Balance helpers ───────────────────────────────────────────────────────
 
