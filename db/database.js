@@ -96,6 +96,11 @@ function createSchema() {
       hidden    INTEGER NOT NULL DEFAULT 0,
       timestamp TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    
+    CREATE TABLE IF NOT EXISTS config (
+      guild_id  TEXT PRIMARY KEY,
+      map_url   TEXT
+    );
   `);
 }
 
@@ -198,6 +203,20 @@ function listItems(guildId) {
   return all(`SELECT * FROM item WHERE guild_id = ? ORDER BY rarity, name`, [guildId]);
 }
 
+// ─── Map helpers ─────────────────────────────────────────────────────
+
+function setMap(guildId, url) {
+  run(`
+    INSERT INTO config (guild_id, map_url) VALUES (?, ?)
+    ON CONFLICT(guild_id) DO UPDATE SET map_url = excluded.map_url
+  `, [guildId, url]);
+}
+
+function getMap(guildId) {
+  const row = get(`SELECT map_url FROM config WHERE guild_id = ?`, [guildId]);
+  return row?.map_url ?? null;
+}
+
 // ─── Inventory helpers ─────────────────────────────────────────────────────
 
 function getInventory(userId, guildId) {
@@ -272,6 +291,7 @@ function transferItem(fromId, toId, guildId, itemId, amount = 1) {
 module.exports = {
   ready,
   CURRENCIES, RARITIES, RARITY_COLORS,
+  setMap, getMap,
   hasPlayer, createPlayer, getUser, updateUser,
   getBalance, addBalance, transferBalance,
   createItem, getItem, findItem, listItems,
